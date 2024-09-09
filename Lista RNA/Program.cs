@@ -5,15 +5,19 @@ using System.Linq;
 class Perceptron
 {
     static Random random = new Random();
-    static double[] weights;
+    static double[] peso;
     static double bias;
-    static double learningRate = 0.01;
-    static int maxEpochs = 1000;
-    static double minError = 0.01;
+    static double taxaAprendizagem = 1;
+    static int maxEpocas = 20000;
+    static double minErros = 0.01;
+
+    // Variáveis para armazenar o mínimo e o máximo de cada entrada
+    static double[] minValues;
+    static double[] maxValues;
 
     static void Main(string[] args)
     {
-        // Características das frutas: [peso, cor (1 = laranja, 0 = maçã)]
+        //[peso, cor (1 = laranja, 0 = maçã)]
         double[][] inputs = new double[][]
         {
             new double[] {150, 1}, // Laranja
@@ -24,58 +28,69 @@ class Perceptron
             new double[] {155, 1}  // Laranja
         };
 
-        // Saídas desejadas: 1 = Laranja, 0 = Maçã
         int[] outputs = { 1, 0, 1, 0, 0, 1 };
 
         // Normalização dos dados
-        NormalizeData(inputs);
+        NormalizarDados(inputs);
 
         // Inicializa pesos e bias com valores aleatórios
-        InitializeWeights(inputs[0].Length);
+        InicializarPeso(inputs[0].Length);
 
         // Treinamento do perceptron
-        TrainPerceptron(inputs, outputs);
+        TreinamentoPerceptron(inputs, outputs);
 
-        // Teste com novos dados
-        TestPerceptron(new double[] { 148, 1 }); // Laranja esperada
-        TestPerceptron(new double[] { 135, 0 }); // Maçã esperada
-        TestPerceptron(new double[] { 142, 1 }); // Laranja esperada
-        TestPerceptron(new double[] { 125, 0 }); // Maçã esperada
-        TestPerceptron(new double[] { 152, 1 }); // Laranja esperada
+        // Teste com novos dados (lembrando que usamos a mesma normalização)
+        TestePerceptron(new double[] { 148, 1 }); // Laranja esperada
+        TestePerceptron(new double[] { 135, 0 }); // Maçã esperada
+        TestePerceptron(new double[] { 142, 1 }); // Laranja esperada
+        TestePerceptron(new double[] { 125, 0 }); // Maçã esperada
+        TestePerceptron(new double[] { 152, 1 }); // Laranja esperada
 
         // Salvar os pesos e bias em um arquivo
-        SaveModel("perceptron_model.txt");
+        SalvarModelo("perceptron_model.txt");
 
         // Carregar o modelo salvo
-        LoadModel("perceptron_model.txt");
+        CarregarModelo("perceptron_model.txt");
     }
 
-    static void NormalizeData(double[][] inputs)
+    static void NormalizarDados(double[][] inputs)
     {
-        for (int i = 0; i < inputs[0].Length; i++)
+        int inputSize = inputs[0].Length;
+        minValues = new double[inputSize];
+        maxValues = new double[inputSize];
+
+        for (int i = 0; i < inputSize; i++)
         {
-            double max = inputs.Max(input => input[i]);
-            double min = inputs.Min(input => input[i]);
+            maxValues[i] = inputs.Max(input => input[i]);
+            minValues[i] = inputs.Min(input => input[i]);
             for (int j = 0; j < inputs.Length; j++)
             {
-                inputs[j][i] = (inputs[j][i] - min) / (max - min);
+                inputs[j][i] = (inputs[j][i] - minValues[i]) / (maxValues[i] - minValues[i]);
             }
         }
     }
 
-    static void InitializeWeights(int inputSize)
+    static void NormalizarEntrada(double[] input)
     {
-        weights = new double[inputSize];
+        for (int i = 0; i < input.Length; i++)
+        {
+            input[i] = (input[i] - minValues[i]) / (maxValues[i] - minValues[i]);
+        }
+    }
+
+    static void InicializarPeso(int inputSize)
+    {
+        peso = new double[inputSize];
         for (int i = 0; i < inputSize; i++)
         {
-            weights[i] = random.NextDouble() * 2 - 1; // Pesos entre -1 e 1
+            peso[i] = random.NextDouble() * 2 - 1; // Pesos entre -1 e 1
         }
         bias = random.NextDouble() * 2 - 1; // Bias entre -1 e 1
     }
 
-    static void TrainPerceptron(double[][] inputs, int[] outputs)
+    static void TreinamentoPerceptron(double[][] inputs, int[] outputs)
     {
-        for (int epoch = 0; epoch < maxEpochs; epoch++)
+        for (int epoch = 0; epoch < maxEpocas; epoch++)
         {
             double totalError = 0;
 
@@ -85,19 +100,18 @@ class Perceptron
                 int error = outputs[i] - predicted;
 
                 // Ajusta pesos e bias
-                for (int j = 0; j < weights.Length; j++)
+                for (int j = 0; j < peso.Length; j++)
                 {
-                    weights[j] += learningRate * error * inputs[i][j];
+                    peso[j] += taxaAprendizagem * error * inputs[i][j];
                 }
-                bias += learningRate * error;
+                bias += taxaAprendizagem * error;
 
                 totalError += Math.Abs(error);
             }
 
-            // Monitoramento da função de custo
             Console.WriteLine($"Época {epoch + 1}, Erro Total: {totalError}");
 
-            if (totalError < minError)
+            if (totalError < minErros)
             {
                 Console.WriteLine("Treinamento completo com sucesso!");
                 break;
@@ -110,40 +124,34 @@ class Perceptron
         double sum = bias;
         for (int i = 0; i < input.Length; i++)
         {
-            sum += weights[i] * input[i];
+            sum += peso[i] * input[i];
         }
         return sum >= 0 ? 1 : 0; // Função de ativação degrau
     }
 
-    static void TestPerceptron(double[] input)
+    static void TestePerceptron(double[] input)
     {
-        double[] normalizedInput = new double[input.Length];
-        for (int i = 0; i < input.Length; i++)
-        {
-            double max = input.Max();
-            double min = input.Min();
-            normalizedInput[i] = (input[i] - min) / (max - min);
-        }
+        NormalizarEntrada(input);
 
-        int result = Predict(normalizedInput);
+        int result = Predict(input);
         Console.WriteLine($"Entrada: [{string.Join(", ", input)}] => Saída prevista: {(result == 1 ? "Laranja" : "Maçã")}");
     }
 
-    static void SaveModel(string filePath)
+    static void SalvarModelo(string filePath)
     {
         using (StreamWriter writer = new StreamWriter(filePath))
         {
-            writer.WriteLine(string.Join(",", weights));
+            writer.WriteLine(string.Join(",", peso));
             writer.WriteLine(bias);
         }
         Console.WriteLine("Modelo salvo com sucesso!");
     }
 
-    static void LoadModel(string filePath)
+    static void CarregarModelo(string filePath)
     {
         using (StreamReader reader = new StreamReader(filePath))
         {
-            weights = reader.ReadLine().Split(',').Select(double.Parse).ToArray();
+            peso = reader.ReadLine().Split(',').Select(double.Parse).ToArray();
             bias = double.Parse(reader.ReadLine());
         }
         Console.WriteLine("Modelo carregado com sucesso!");
